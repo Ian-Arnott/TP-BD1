@@ -180,3 +180,49 @@ COPY definitiva(
     (SELECT pais.id FROM pais WHERE pais.nombre = new.pais)
     ,Total,Aerea,Maritima,Anio) FROM tourists-rj.csv DELIMITER ',' CSV;
 */
+
+-- Reporte de analisis consolidado
+
+CREATE OR REPLACE FUNCTION AnalisisConsolidado(IN anios INTEGER)
+RETURNS VOID AS $$
+DECLARE
+    anioAnalizado INT;
+    imprimirAnio BOOLEAN;
+    tipoCategoria CHAR(20);
+    categoria CHAR(20);
+    total INT;
+    totalAnual INT;
+    promedio INT;
+    promedioAnual INT;
+BEGIN
+    IF (anios <= 0) THEN
+        RAISE WARNING 'La cantidad de anios debe ser mayor a 0.';
+        RETURN;
+    END IF;
+
+    SELECT min(anio) INTO anioAnalizado FROM anio;
+
+    RAISE NOTICE '-------------------CONSOLIDATED TOURIST REPORT-------------------';
+    RAISE NOTICE '-----------------------------------------------------------------';
+    RAISE NOTICE 'Year---Category-----------------------------------Total---Average';
+    RAISE NOTICE '-----------------------------------------------------------------';
+
+    imprimirAnio := TRUE;
+
+    WHILE (anios>0) LOOP
+
+        /* TODO: esto entra en un loop de fetch
+        IF (imprimirAnio = TRUE) THEN
+            RAISE NOTICE '%   %: %    %    %', anio, tipoCategoria, categoria, total, promedio;
+            imprimirAnio = FALSE;
+        ELSE
+            RAISE NOTICE '----   %: %    %    %', tipoCategoria, categoria, total, promedio;
+        END IF;
+        */
+        anios := anios - 1;
+        anioAnalizado := anioAnalizado + 1;
+        imprimirAnio := TRUE;
+    END LOOP;
+
+END;
+$$ LANGUAGE plpgsql;
