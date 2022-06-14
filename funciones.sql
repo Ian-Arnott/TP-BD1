@@ -1,4 +1,4 @@
--- Tablas
+-- Tablas ------------------------------------------------------------------------------------------------------
 
 CREATE TABLE continente
 (
@@ -44,7 +44,7 @@ CREATE TABLE definitiva
     FOREIGN KEY(pais) REFERENCES pais ON DELETE CASCADE -- TODO Necesita...? ON UPDATE RESTRICT
 );
 
--- Funciones auxiliares
+-- Funciones auxiliares ----------------------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION esBisiesto(panio IN anio.anio%TYPE)
 RETURNS anio.esBisiesto%TYPE AS $$
@@ -60,7 +60,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger para llenar tablas
+-- Trigger para llenar tablas ----------------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION llenarTabla()
 RETURNS TRIGGER AS $$
@@ -74,6 +74,9 @@ DECLARE
     idRegion            INT;
     idPais              INT;
 BEGIN
+
+    -- Si los counts dan 0, es porque el dato no existe en la tabla y debe agregarse
+
     SELECT COUNT(*) INTO existeAnio FROM anio WHERE anio.anio = new.anio;
     IF existeAnio = 0 THEN
         auxEsBisiesto := esBisiesto(new.anio);
@@ -104,82 +107,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- TODO a chequear este trigger
 CREATE TRIGGER llenarTablaTrigger
 BEFORE INSERT OR UPDATE ON definitiva
 FOR EACH ROW
 EXECUTE PROCEDURE llenarTabla();
 
-/*
--- Trigger de angie
-
-DECLARE @global_idContinente INT = 1;
-DECLARE @global_idRegion INT = 1;
-DECLARE @global_idPais INT = 1;
-
-CREATE OR REPLACE FUNCTION llenarTabla()
-RETURNS TRIGGER AS $$
-DECLARE
-    existeContinente INT;
-    existePais INT;
-    existeReion INT;
-    auxEsBisiesto BOOLEAN;
-    existeAnio INT;
-BEGIN
-    SELECT COUNT(*) INTO existeAnio FROM anio WHERE anio.anio = new.anio;
-    IF existeAnio = 0 THEN
-        auxEsBisiesto := esBisiesto(new.anio);
-        INSERT INTO anio VALUES (new.anio, auxEsBisiesto); 
-    END IF;
-
-    SELECT COUNT(*) INTO existeContinente FROM continente WHERE continente.nombre = new.continente;
-    IF existeContinente = 0 THEN
-        INSERT INTO continente VALUES (@global_idContinente, new.continente);
-        @global_idContinente += 1;
-    END IF;
-
-    SELECT COUNT(*) INTO existeRegion FROM region WHERE region.nombre = new.region;
-    IF existeRegion = 0 THEN
-        INSERT INTO region VALUES (@global_idRegion, @global_idContinente, new.region);
-        @global_idRegion += 1;
-    END IF;
-
-    SELECT COUNT(*) INTO existePais FROM pais WHERE pais.nombre = new.pais;
-    IF existePais = 0 THEN
-        INSERT INTO pais VALUES (@global_idPais, @global_idRegion, new.pais);
-        @global_idPais += 1;
-    END IF;
-
-    RETURN new;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER llenarTablaTrigger
-BEFORE INSERT OR UPDATE ON definitiva
-FOR EACH ROW
-EXECUTE PROCEDURE llenarTabla();
-
-CREATE OR REPLACE FUNCTION llenarId()
-RETURNS TRIGGER AS $$
-DECLARE
-    existeContinente INT;
-    existePais INT;
-    existeReion INT;
-BEGIN
-
-    UPDATE definitiva SET idPais = ...;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER llenarIdTrigger
-AFTER INSERT OR UPDATE ON definitiva
-EXECUTE PROCEDURE llenarId();
-
-COPY definitiva(
-    (SELECT pais.id FROM pais WHERE pais.nombre = new.pais)
-    ,Total,Aerea,Maritima,Anio) FROM tourists-rj.csv DELIMITER ',' CSV;
-*/
-
--- Reporte de analisis consolidado + funciones modularizadas
+-- Reporte de analisis consolidado + funciones modularizadas ---------------------------------------------------
 
 CREATE OR REPLACE FUNCTION imprimirEncabezado()
 RETURNS VOID AS $$
@@ -191,6 +125,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
 CREATE OR REPLACE FUNCTION imprimirData(IN imprimirAnio BOOLEAN, IN anio INT, IN tipoCategoria TEXT,
                                         IN categoria TEXT, IN total INT, IN promedio INT)
 RETURNS VOID AS $$
@@ -200,6 +135,17 @@ BEGIN
     ELSE
         RAISE NOTICE '----   %: %    %    %', tipoCategoria, categoria, total, promedio;
     END IF;
+END;
+$$ LANGUAGE plpgsql
+RETURNS NULL ON NULL INPUT;
+
+
+CREATE OR REPLACE FUNCTION imprimirPie(IN total INT, IN promedio INT)
+RETURNS VOID AS $$
+BEGIN
+    RAISE NOTICE '--------------------------------------   %    %', total, promedio;
+    RAISE NOTICE '-----------------------------------------------------------------';
+
 END;
 $$ LANGUAGE plpgsql;
 
@@ -224,23 +170,26 @@ BEGIN
     SELECT min(anio) INTO anioAnalizado FROM anio;
 
     PERFORM imprimirEncabezado();
-    imprimirAnio := TRUE;
 
-    WHILE (anios>0) LOOP
+    WHILE (anios > 0) LOOP
+        imprimirAnio := TRUE;
+
 
         /* Adentro del fetch
         PERFORM imprimirData(imprimirAnio, anio, tipoCategoria,categoria, total, promedio);
         */
+        SELECT COALESCE(SUM(total),0) INTO totalAnual FROM definitiva WHERE definitiva.anio = anioAnalizado;
+        SELECT COALESCE(AVG(total),0) INTO promedioAnual FROM definitiva WHERE definitiva.anio = anioAnalizado;
+        PERFORM imprimirPie(totalAnual, promedioAnual);
 
         anios := anios - 1;
         anioAnalizado := anioAnalizado + 1;
-        imprimirAnio := TRUE;
     END LOOP;
 
 END;
 $$ LANGUAGE plpgsql;
 
--- Eliminar tablas
+-- Eliminar tablas ---------------------------------------------------------------------------------------------
 
 DROP TABLE IF EXISTS definitiva;
 DROP TABLE IF EXISTS anio;
@@ -248,8 +197,9 @@ DROP TABLE IF EXISTS pais;
 DROP TABLE IF EXISTS region;
 DROP TABLE IF EXISTS continente;
 
--- Eliminar funciones
+-- Eliminar funciones ------------------------------------------------------------------------------------------
 
 DROP FUNCTION IF EXISTS imprimirEncabezado;
 DROP FUNCTION IF EXISTS imprimirData;
-DROP FUNCTION IF EXISTS AnalisisConsolidado
+DROP FUNCTION IF EXISTS imprimirPie;
+DROP FUNCTION IF EXISTS AnalisisConsolidado;
