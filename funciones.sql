@@ -4,7 +4,8 @@ CREATE TABLE continente
 (
     id              INT NOT NULL,
     nombre          TEXT NOT NULL,
-    PRIMARY KEY(id)
+    PRIMARY KEY(id),
+    UNIQUE(nombre)
 );
 
 CREATE TABLE region
@@ -13,6 +14,7 @@ CREATE TABLE region
     idContinente    INT NOT NULL,
     nombre          TEXT NOT NULL,
     PRIMARY KEY(id),
+    UNIQUE(nombre),
     FOREIGN KEY(idContinente) REFERENCES continente ON DELETE CASCADE -- TODO Necesita...? ON UPDATE RESTRICT
 );
 
@@ -22,6 +24,7 @@ CREATE TABLE pais
     idRegion        INT NOT NULL,
     nombre          TEXT NOT NULL,
     PRIMARY KEY(id),
+    UNIQUE(nombre),
     FOREIGN KEY(idRegion) REFERENCES region ON DELETE CASCADE -- TODO Necesita...? ON UPDATE RESTRICT
 );
 
@@ -37,12 +40,18 @@ CREATE TABLE definitiva
     pais            INT NOT NULL, -- ID del pais
     total           INT NOT NULL CHECK(total >= 0),
     aerea           INT NOT NULL CHECK(aerea >= 0),
-    maritima        INT NOT NULL CHECK(maritima >= 0),
+    maritima        INT NOT NULL CHECK(maritima >= 0), -- TODO add to check AND maritima = total - aerea
     anio            INT NOT NULL,
     PRIMARY KEY(pais, anio),
     FOREIGN KEY(anio) REFERENCES anio ON DELETE CASCADE, -- TODO Necesita...? ON UPDATE RESTRICT
     FOREIGN KEY(pais) REFERENCES pais ON DELETE CASCADE -- TODO Necesita...? ON UPDATE RESTRICT
 );
+
+CREATE VIEW auxiliar AS
+SELECT pais.nombre AS pais, total, aerea, maritima, 
+        region.nombre AS region, continente.nombre AS continente, anio
+FROM definitiva, pais, region, continente
+WHERE definitiva.pais = pais.id AND pais.idRegion = region.id AND region.idContinente = continente.id;
 
 -- Funciones auxiliares ----------------------------------------------------------------------------------------
 
@@ -103,13 +112,15 @@ BEGIN
         INSERT INTO pais VALUES (idPais, idRegion, new.pais);
     END IF;
 
+    INSERT INTO definitiva VALUES (idPais, new.total, new.aerea, new.maritima, new.anio);
+
     RETURN new;
 END;
 $$ LANGUAGE plpgsql;
 
 -- TODO a chequear este trigger
 CREATE TRIGGER llenarTablaTrigger
-BEFORE INSERT OR UPDATE ON definitiva
+INSTEAD OF INSERT ON auxiliar
 FOR EACH ROW
 EXECUTE PROCEDURE llenarTabla();
 
@@ -191,11 +202,12 @@ $$ LANGUAGE plpgsql;
 
 -- Eliminar tablas ---------------------------------------------------------------------------------------------
 
-DROP TABLE IF EXISTS definitiva;
-DROP TABLE IF EXISTS anio;
-DROP TABLE IF EXISTS pais;
-DROP TABLE IF EXISTS region;
-DROP TABLE IF EXISTS continente;
+DROP TABLE IF EXISTS definitiva CASCADE;
+DROP TABLE IF EXISTS anio CASCADE;
+DROP TABLE IF EXISTS pais CASCADE;
+DROP TABLE IF EXISTS region CASCADE;
+DROP TABLE IF EXISTS continente CASCADE;
+DROP VIEW IF EXISTS auxiliar;
 
 -- Eliminar funciones ------------------------------------------------------------------------------------------
 
@@ -203,3 +215,4 @@ DROP FUNCTION IF EXISTS imprimirEncabezado;
 DROP FUNCTION IF EXISTS imprimirData;
 DROP FUNCTION IF EXISTS imprimirPie;
 DROP FUNCTION IF EXISTS AnalisisConsolidado;
+
