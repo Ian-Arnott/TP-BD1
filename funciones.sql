@@ -24,7 +24,6 @@ CREATE TABLE pais
     idRegion        INT NOT NULL,
     nombre          TEXT NOT NULL,
     PRIMARY KEY(id),
-    UNIQUE(nombre),
     FOREIGN KEY(idRegion) REFERENCES region ON DELETE CASCADE -- TODO Necesita...? ON UPDATE RESTRICT
 );
 
@@ -112,6 +111,8 @@ BEGIN
         INSERT INTO pais VALUES (idPais, idRegion, new.pais);
     END IF;
 
+    SELECT pais.id INTO idPais FROM pais, continente 
+            WHERE pais.nombre = new.pais AND continente.nombre = new.continente;
     INSERT INTO definitiva VALUES (idPais, new.total, new.aerea, new.maritima, new.anio);
 
     RETURN new;
