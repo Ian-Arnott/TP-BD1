@@ -215,6 +215,7 @@ BEGIN
 
     PERFORM imprimirEncabezado();
         
+    
     WHILE (cantAnios > 0) LOOP
         imprimirAnio := TRUE;
 
@@ -228,7 +229,7 @@ BEGIN
                 JOIN continente ON region.idContinente = continente.id
             WHERE definitiva.anio = anioAnalizado
             GROUP BY continente.id, anio
-            ORDER BY anio; 
+            ORDER BY anio, continente.nombre; 
         LOOP
             FETCH cDatosContinente INTO rcDatosContinente;
             EXIT WHEN NOT FOUND;
